@@ -1,10 +1,10 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 
-export async function requireAuth(req, res, next) {
+export async function requireAuth(req, res  , next) {
     try {
         const header = req.headers.authorization;
-        if (!header || !header.startWith('Bearer ')) {
+        if (!header || !header.startsWith('Bearer ')) {
             return res.status(401).json({ message: 'No token provided' });
         }
 

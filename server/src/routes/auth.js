@@ -2,6 +2,7 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -60,5 +61,10 @@ router.post('/login', async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 });
+
+router.get('/me', requireAuth, (req, res) => {
+    res.json({ user: { id: req.user._id, name: req.user.name, email: req.user.email } });
+});
+
 
 export default router;
