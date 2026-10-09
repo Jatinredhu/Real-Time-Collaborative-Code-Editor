@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 
-export async function requireAuth(req, res  , next) {
+export async function requireAuth(req, res, next) {
     try {
         const header = req.headers.authorization;
         if (!header || !header.startsWith('Bearer ')) {
@@ -19,6 +19,7 @@ export async function requireAuth(req, res  , next) {
         req.user = user;
         next(); 
     } catch (err) {
+        console.error('auth error:', err.message);
         return res.status(401).json({ message: 'Invalid or expired token' });
     }
 }
