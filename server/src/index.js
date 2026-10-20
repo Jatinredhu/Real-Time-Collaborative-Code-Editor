@@ -6,7 +6,7 @@ import { Server } from 'socket.io';
 import { connectDB } from './config/db.js';
 import authRoutes from './routes/auth.js';
 import docRoutes from './routes/docs.js';
-
+import { registerSync } from './socket/sync.js';
 
 const app = express();
 app.use(cors({ origin: process.env.CLIENT_URL }));
@@ -25,6 +25,7 @@ const io = new Server(server, {
 
 io.on('connection', (socket) => {
     console.log('socket connected:', socket.id);
+    registerSync(io);
 });
 
 await connectDB();
