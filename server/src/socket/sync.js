@@ -81,9 +81,20 @@ async function closeRoomIfEmpty(io, docId) {
 
   const after = io.sockets.adapter.rooms.get(docId);
   if (!after || after.size === 0) {
+    room.awareness.destroy();
     room.ydoc.destroy();
     rooms.delete(docId);
   }
+}
+
+async function dropAwareness(socketId, docId) {
+  const room = await rooms.get(docId);
+  if (!room) return;
+  const ids = room.controlled.get(socketId);
+  if (ids && ids.size > 0) {
+    awarenessProtocol.removeAwarenessStates(room.awareness, Array.from(ids), null);
+  }
+  room.controlled.delete(socketId);
 }
 
 export async function flushAll() {
@@ -135,6 +146,10 @@ export function registerSync(io) {
           role,
           language: meta.language,
           update: Y.encodeStateAsUpdate(room.ydoc),
+          awareness: awarenessProtocol.encodeAwarenessUpdate(
+            room.awareness,
+            Array.from(room.awareness.getStates().keys())
+          ),
         });
       } catch (err) {
         socket.leave(docId);
@@ -159,14 +174,28 @@ export function registerSync(io) {
       }
     });
 
-    socket.on('leave-doc', (docId) => {
+    socket.on('awareness-update', async (docId, update) => {
+      try {
+        if (!socket.data.docs.has(docId)) return;
+        if (!(update instanceof Uint8Array)) return;
+        const room = await getRoom(docId);
+        if (!room) return;
+        awarenessProtocol.applyAwarenessUpdate(room.awareness, update, socket.id);
+      } catch (err) {
+        console.error('bad awareness update:', err.message);
+      }
+    });
+
+    socket.on('leave-doc', async (docId) => {
       socket.leave(docId);
       socket.data.docs.delete(docId);
+      await dropAwareness(socket.id, docId);
       closeRoomIfEmpty(io, docId);
     });
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
       for (const docId of socket.data.docs.keys()) {
+        await dropAwareness(socket.id, docId);
         closeRoomIfEmpty(io, docId);
       }
     });
