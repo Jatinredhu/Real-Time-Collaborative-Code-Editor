@@ -15,8 +15,27 @@ function getRoom(docId) {
       if (!doc) return null;
       const ydoc = new Y.Doc();
       if (doc.state) Y.applyUpdate(ydoc, new Uint8Array(doc.state));
-      const room = { ydoc, saveTimer: null, maxTimer: null };
+      const awareness = new awarenessProtocol.Awareness(ydoc);
+      awareness.setLocalState(null);
+      const room = { ydoc, awareness, controlled: new Map(), saveTimer: null, maxTimer: null };
       ydoc.on('update', () => scheduleSave(docId, room));
+
+      awareness.on('update', ({ added, updated, removed }, origin) => {
+        if (typeof origin === 'string') {
+          const ids = room.controlled.get(origin) ?? new Set();
+          added.forEach((id) => ids.add(id));
+          removed.forEach((id) => ids.delete(id));
+          room.controlled.set(origin, ids);
+        }
+        const changed = added.concat(updated, removed);
+        const update = awarenessProtocol.encodeAwarenessUpdate(awareness, changed);
+        const target = ioServer.to(docId);
+        (typeof origin === 'string' ? target.except(origin) : target).emit(
+          'awareness-update',
+          docId,
+          update
+        );
+      });
       return room;
     })();
     rooms.set(docId, promise);
@@ -74,6 +93,7 @@ export async function flushAll() {
   }
 }
 
+ioServer = io;
 export function registerSync(io) {
   io.use(async (socket, next) => {
     try {
