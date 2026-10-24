@@ -13,7 +13,9 @@ function getRoom(docId) {
       if (!doc) return null;
       const ydoc = new Y.Doc();
       if (doc.state) Y.applyUpdate(ydoc, new Uint8Array(doc.state));
-      return { ydoc };
+      const room = { ydoc, saveTimer: null, maxTimer: null };
+      ydoc.on('update', () => scheduleSave(docId, room));
+      return room;
     })();
     rooms.set(docId, promise);
     promise.then((room) => {
@@ -21,6 +23,53 @@ function getRoom(docId) {
     }).catch(() => rooms.delete(docId));
   }
   return rooms.get(docId);
+}
+
+const SAVE_DELAY = 2000;
+const SAVE_MAX_WAIT = 10000;
+
+async function saveRoom(docId, room) {
+  clearTimeout(room.saveTimer);
+  clearTimeout(room.maxTimer);
+  room.saveTimer = null;
+  room.maxTimer = null;
+  try {
+    const state = Buffer.from(Y.encodeStateAsUpdate(room.ydoc));
+    await Doc.updateOne({ _id: docId }, { $set: { state } });
+  } catch (err) {
+    console.error('save failed for', docId, err.message);
+  }
+}
+
+function scheduleSave(docId, room) {
+  clearTimeout(room.saveTimer);
+  room.saveTimer = setTimeout(() => saveRoom(docId, room), SAVE_DELAY);
+  if (!room.maxTimer) {
+    room.maxTimer = setTimeout(() => saveRoom(docId, room), SAVE_MAX_WAIT);
+  }
+}
+
+async function closeRoomIfEmpty(io, docId) {
+  const members = io.sockets.adapter.rooms.get(docId);
+  if (members && members.size > 0) return;
+
+  const room = await rooms.get(docId);
+  if (!room) return;
+
+  await saveRoom(docId, room);
+
+  const after = io.sockets.adapter.rooms.get(docId);
+  if (!after || after.size === 0) {
+    room.ydoc.destroy();
+    rooms.delete(docId);
+  }
+}
+
+export async function flushAll() {
+  for (const [docId, promise] of rooms) {
+    const room = await promise;
+    if (room) await saveRoom(docId, room);
+  }
 }
 
 export function registerSync(io) {
@@ -52,10 +101,12 @@ export function registerSync(io) {
         const role = meta.getRole(socket.data.user._id);
         if (!role) return ack({ ok: false, message: 'No access' });
 
-        const room = await getRoom(docId);
-        if (!room) return ack({ ok: false, message: 'Document not found' });
-
         socket.join(docId);
+        const room = await getRoom(docId);
+        if (!room) {
+          socket.leave(docId);
+          return ack({ ok: false, message: 'Document not found' });
+        }
         socket.data.docs.set(docId, role);
         ack({
           ok: true,
@@ -64,6 +115,7 @@ export function registerSync(io) {
           update: Y.encodeStateAsUpdate(room.ydoc),
         });
       } catch (err) {
+        socket.leave(docId);
         console.error(err);
         ack({ ok: false, message: 'Server error' });
       }
@@ -88,6 +140,13 @@ export function registerSync(io) {
     socket.on('leave-doc', (docId) => {
       socket.leave(docId);
       socket.data.docs.delete(docId);
+      closeRoomIfEmpty(io, docId);
+    });
+
+    socket.on('disconnect', () => {
+      for (const docId of socket.data.docs.keys()) {
+        closeRoomIfEmpty(io, docId);
+      }
     });
   });
 }

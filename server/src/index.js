@@ -7,6 +7,7 @@ import { connectDB } from './config/db.js';
 import authRoutes from './routes/auth.js';
 import docRoutes from './routes/docs.js';
 import { registerSync } from './socket/sync.js';
+import { registerSync, flushAll } from './socket/sync.js';
 
 const app = express();
 app.use(cors({ origin: process.env.CLIENT_URL }));
@@ -32,3 +33,11 @@ await connectDB();
 server.listen(process.env.PORT, () => {
     console.log(`Server running on port ${process.env.PORT}`);
 });
+
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.on(signal, async () => {
+    console.log(`${signal} received, saving documents...`);
+    await flushAll();
+    process.exit(0);
+  });
+}
