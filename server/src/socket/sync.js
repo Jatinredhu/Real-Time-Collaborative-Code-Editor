@@ -3,8 +3,10 @@ import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import User from '../models/User.js';
 import Doc from '../models/Doc.js';
+import * as awarenessProtocol from 'y-protocols/awareness';
 
 const rooms = new Map();
+let ioServer = null;
 
 function getRoom(docId) {
   if (!rooms.has(docId)) {

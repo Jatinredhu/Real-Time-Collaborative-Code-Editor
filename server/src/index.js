@@ -6,7 +6,6 @@ import { Server } from 'socket.io';
 import { connectDB } from './config/db.js';
 import authRoutes from './routes/auth.js';
 import docRoutes from './routes/docs.js';
-import { registerSync } from './socket/sync.js';
 import { registerSync, flushAll } from './socket/sync.js';
 
 const app = express();
