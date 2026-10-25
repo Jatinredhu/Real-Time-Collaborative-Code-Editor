@@ -104,8 +104,8 @@ export async function flushAll() {
   }
 }
 
-ioServer = io;
 export function registerSync(io) {
+  ioServer = io;
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth?.token;
