@@ -117,6 +117,18 @@ export default function Editor() {
           {role && (
             <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700">{role}</span>
           )}
+          <select
+            value={language}
+            onChange={(e) => providerRef.current?.setLanguage(e.target.value)}
+            disabled={role === 'viewer'}
+            className="rounded border border-gray-300 px-2 py-1 text-sm disabled:opacity-50"
+          >
+            {Object.entries(LANGUAGES).map(([key, lang]) => (
+              <option key={key} value={key}>
+                {lang.label}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="flex items-center gap-2">
           {users.map((u) => (
