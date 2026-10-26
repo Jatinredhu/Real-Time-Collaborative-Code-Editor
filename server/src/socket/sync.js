@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import User from '../models/User.js';
 import Doc from '../models/Doc.js';
 import * as awarenessProtocol from 'y-protocols/awareness';
+import { LANGUAGES } from '../constants.js';
 
 const rooms = new Map();
 let ioServer = null;
@@ -134,8 +135,13 @@ export function registerSync(io) {
         const role = meta.getRole(socket.data.user._id);
         if (!role) return ack({ ok: false, message: 'No access' });
 
+        if (!socket.connected) return;
         socket.join(docId);
         const room = await getRoom(docId);
+        if (!socket.connected) {
+          closeRoomIfEmpty(io, docId);
+          return;
+        }
         if (!room) {
           socket.leave(docId);
           return ack({ ok: false, message: 'Document not found' });
@@ -171,6 +177,19 @@ export function registerSync(io) {
         socket.to(docId).emit('doc-update', docId, update);
       } catch (err) {
         console.error('bad update:', err.message);
+      }
+    });
+
+    socket.on('language-change', async (docId, language) => {
+      try {
+        const role = socket.data.docs.get(docId);
+        if (!role || role === 'viewer') return;
+        if (!LANGUAGES.includes(language)) return;
+
+        await Doc.updateOne({ _id: docId }, { $set: { language } });
+        io.to(docId).emit('language-change', docId, language);
+      } catch (err) {
+        console.error('language change failed:', err.message);
       }
     });
 

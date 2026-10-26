@@ -1,0 +1,1 @@
+export const LANGUAGES = ['javascript', 'python', 'cpp', 'java'];

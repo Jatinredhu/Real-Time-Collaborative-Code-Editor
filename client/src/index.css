@@ -1,1 +1,9 @@
 @import "tailwindcss";
+
+.cm-editor {
+  height: 100%;
+  font-size: 15px;
+}
+.cm-editor.cm-focused {
+  outline: none;
+}

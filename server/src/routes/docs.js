@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import Doc from '../models/Doc.js';
 import { requireAuth } from '../middleware/auth.js';
 import User from '../models/User.js';
+import { LANGUAGES } from '../constants.js';
 
 const router = express.Router();
 router.use(requireAuth);
@@ -63,8 +64,6 @@ router.get('/:id', loadDoc, (req, res) => {
 });
 
 
-
-const LANGUAGES = ['javascript', 'python', 'cpp', 'java'];
 
 router.patch('/:id', loadDoc, async (req, res) => {
     try {
